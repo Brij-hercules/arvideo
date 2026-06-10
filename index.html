@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Postcard AR Scanner</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="assets/mindar-image-aframe.prod.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20000;
+            transition: opacity 0.5s ease;
+        }
+
+        #start-btn {
+            padding: 18px 45px;
+            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0, 242, 254, 0.3);
+            display: none;
+            /* 初期隱藏，等待系統或超時 */
+        }
+
+        #start-btn:active {
+            transform: scale(0.95);
+        }
+
+        .loading-text {
+            color: #888;
+            margin-top: 20px;
+            font-size: 14px;
+            text-align: center;
+            padding: 0 30px;
+            line-height: 1.6;
+        }
+
+        a-scene {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas.a-canvas {
+            background-color: transparent !important;
+        }
+
+        video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            z-index: -1;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="start-overlay">
+        <h2 style="color: white; margin-bottom: 5px;">AR 明信片掃描</h2>
+        <p class="loading-text" id="init-text">請按下按鈕並允許相機權限<br>即可開始體驗</p>
+        <button id="start-btn" style="display: block;">進入掃描模式</button>
+    </div>
+
+    <div id="ui-overlay">
+        <div id="scanning-indicator" class="hidden">
+            <div class="scanner-frame"></div>
+            <p>請將相機對準明信片</p>
+        </div>
+        <div id="tap-to-play" class="overlay hidden" style="background: rgba(0,0,0,0.8); z-index: 10001;">
+            <div style="font-size: 60px;">▶️</div>
+            <p>點擊播放影片</p>
+        </div>
+    </div>
+
+    <a-scene
+        mindar-image="imageTargetSrc: assets/targets.mind?v=1325; maxTrack: 1; autoStart: true; uiLoading: no; uiError: no; uiScanning: no; filterMinCF: 0.001; filterBeta: 10; missTolerance: 5; warmupTolerance: 5;"
+        color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true; alpha: true"
+        vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+
+        <a-assets>
+            <video id="vid1" src="assets/1_1.mp4" playsinline webkit-playsinline loop="false"
+                preload="metadata"></video>
+            <video id="vid2" src="assets/2_1.mp4" playsinline webkit-playsinline loop="false"
+                preload="metadata"></video>
+            <video id="vid3" src="assets/3_1.mp4" playsinline webkit-playsinline loop="false"
+                preload="metadata"></video>
+            <video id="vid4" src="assets/4_1.mp4" playsinline webkit-playsinline loop="false"
+                preload="metadata"></video>
+            <video id="vid5" src="assets/5_1.mp4" playsinline webkit-playsinline loop="false"
+                preload="metadata"></video>
+            <video id="vid6" src="assets/6_1.mp4" playsinline webkit-playsinline loop="false"
+                preload="metadata"></video>
+            <video id="vid7" src="assets/7_1.mp4" playsinline webkit-playsinline loop="false"
+                preload="metadata"></video>
+            <video id="vid8" src="assets/8_1.mp4" playsinline webkit-playsinline loop="false"
+                preload="metadata"></video>
+            <video id="vid9" src="assets/9_1.mp4" playsinline webkit-playsinline loop="false"
+                preload="metadata"></video>
+            <video id="vid10" src="assets/10_1.mp4" playsinline webkit-playsinline loop="false"
+                preload="metadata"></video>
+        </a-assets>
+
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+        <a-entity mindar-image-target="targetIndex: 0" class="ar-target" data-video="vid10">
+            <a-video src="#vid10" position="0 0 0" height="0.7" width="1.244"></a-video>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 1" class="ar-target" data-video="vid9">
+            <a-video src="#vid9" position="0 0 0" height="0.7" width="1.244"></a-video>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 2" class="ar-target" data-video="vid8">
+            <a-video src="#vid8" position="0 0 0" height="0.7" width="1.244"></a-video>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 3" class="ar-target" data-video="vid7">
+            <a-video src="#vid7" position="0 0 0" height="0.7" width="1.244"></a-video>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 4" class="ar-target" data-video="vid6">
+            <a-video src="#vid6" position="0 0 0" height="0.7" width="1.244"></a-video>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 5" class="ar-target" data-video="vid5">
+            <a-video src="#vid5" position="0 0 0" height="0.7" width="1.244"></a-video>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 6" class="ar-target" data-video="vid4">
+            <a-video src="#vid4" position="0 0 0" height="0.7" width="1.244"></a-video>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 7" class="ar-target" data-video="vid3">
+            <a-video src="#vid3" position="0 0 0" height="0.7" width="1.244"></a-video>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 8" class="ar-target" data-video="vid2">
+            <a-video src="#vid2" position="0 0 0" height="0.7" width="1.244"></a-video>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 9" class="ar-target" data-video="vid1">
+            <a-video src="#vid1" position="0 0 0" height="0.7" width="1.244"></a-video>
+        </a-entity>
+    </a-scene>
+
+    <script>
+        window.onload = function () {
+            const sceneEl = document.querySelector('a-scene');
+            const startBtn = document.querySelector('#start-btn');
+            const initText = document.querySelector('#init-text');
+            const overlay = document.querySelector('#start-overlay');
+            const indicator = document.querySelector('#scanning-indicator');
+            let activeVid = null;
+
+            function onReady() {
+                initText.innerText = "系統已準備就緒";
+            }
+
+            sceneEl.addEventListener('ready', onReady);
+
+            startBtn.onclick = function () {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.style.display = 'none', 500);
+                indicator.classList.remove('hidden');
+
+                // 確保引擎啟動
+                try {
+                    const arSystem = sceneEl.systems['mindar-image-system'];
+                    if (arSystem && !arSystem.main) arSystem.start();
+                } catch (e) { console.error(e); }
+
+                // 解鎖影音
+                document.querySelectorAll('video').forEach(v => {
+                    v.play().then(() => { v.pause(); v.currentTime = 0; }).catch(() => { });
+                });
+
+                // 檢查背景相機
+                setTimeout(() => {
+                    const sv = document.querySelector('video[autoplay]');
+                    if (sv) {
+                        if (sv.paused) sv.play().catch(() => { });
+                        sv.style.zIndex = "-1";
+                        sv.style.backgroundColor = "transparent";
+                    }
+                }, 1000);
+            };
+
+
+
+            document.querySelectorAll('.ar-target').forEach(t => {
+                t.addEventListener('targetFound', () => {
+                    const vidId = t.getAttribute('data-video');
+                    indicator.classList.add('hidden');
+                    const v = document.getElementById(vidId);
+                    activeVid = v;
+                    if (v) {
+                        v.play().catch(() => {
+                            document.querySelector('#tap-to-play').classList.remove('hidden');
+                        });
+                    }
+                });
+                t.addEventListener('targetLost', () => {
+                    indicator.classList.remove('hidden');
+                    document.querySelector('#tap-to-play').classList.add('hidden');
+                    const v = document.getElementById(t.getAttribute('data-video'));
+                    if (v) v.pause();
+                    if (activeVid === v) activeVid = null;
+                });
+            });
+
+            document.querySelector('#tap-to-play').onclick = function () {
+                if (activeVid) activeVid.play().catch(() => { });
+                this.classList.add('hidden');
+            };
+        };
+    </script>
+</body>
+
+</html>
