@@ -8,6 +8,83 @@
     <title>Postcard AR Scanner</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="assets/mindar-image-aframe.prod.js"></script>
+    <script>
+        // Register Stabilizer component for A-Frame
+        AFRAME.registerComponent('stabilizer', {
+            schema: {
+                targetId: {type: 'string'},
+                lerpFactor: {type: 'number', default: 0.15} // Responsive baseline tracking
+            },
+            init: function () {
+                this.targetEl = document.getElementById(this.data.targetId);
+                this.found = false;
+                
+                this.currPos = new THREE.Vector3();
+                this.currQuat = new THREE.Quaternion();
+                this.currScale = new THREE.Vector3();
+                
+                this.targetPos = new THREE.Vector3();
+                this.targetQuat = new THREE.Quaternion();
+                this.targetScale = new THREE.Vector3();
+                
+                this.firstTime = true;
+
+                if (this.targetEl) {
+                    this.targetEl.addEventListener('targetFound', () => {
+                        this.found = true;
+                        this.firstTime = true;
+                        this.el.setAttribute('visible', 'true');
+                    });
+                    this.targetEl.addEventListener('targetLost', () => {
+                        this.found = false;
+                        this.el.setAttribute('visible', 'false');
+                    });
+                }
+            },
+            tick: function () {
+                if (!this.found || !this.targetEl) return;
+                
+                const targetObj = this.targetEl.object3D;
+                const containerObj = this.el.object3D;
+                
+                // Force matrix recalculation to get the current frame's true position and avoid lagging a frame behind
+                targetObj.updateMatrixWorld(true);
+                targetObj.matrixWorld.decompose(this.targetPos, this.targetQuat, this.targetScale);
+                
+                if (this.firstTime) {
+                    this.currPos.copy(this.targetPos);
+                    this.currQuat.copy(this.targetQuat);
+                    this.currScale.copy(this.targetScale);
+                    this.firstTime = false;
+                } else {
+                    // Adaptive filtering: scale down interpolation factor for minor movements (high frequency tracking jitter)
+                    const dist = this.currPos.distanceTo(this.targetPos);
+                    const angle = this.currQuat.angleTo(this.targetQuat);
+                    
+                    let pFactor = this.data.lerpFactor;
+                    let rFactor = this.data.lerpFactor;
+                    
+                    if (dist < 0.08) {
+                        pFactor = this.data.lerpFactor * (dist / 0.08);
+                        if (pFactor < 0.015) pFactor = 0.015; // Minimum step to avoid complete lock
+                    }
+                    if (angle < 0.12) {
+                        rFactor = this.data.lerpFactor * (angle / 0.12);
+                        if (rFactor < 0.015) rFactor = 0.015;
+                    }
+                    
+                    this.currPos.lerp(this.targetPos, pFactor);
+                    this.currScale.lerp(this.targetScale, this.data.lerpFactor);
+                    this.currQuat.slerp(this.targetQuat, rFactor);
+                }
+                
+                // Apply smoothed values
+                containerObj.position.copy(this.currPos);
+                containerObj.quaternion.copy(this.currQuat);
+                containerObj.scale.copy(this.currScale);
+            }
+        });
+    </script>
     <link rel="stylesheet" href="style.css">
     <style>
         html,
@@ -101,6 +178,9 @@
             <div style="font-size: 60px;">▶️</div>
             <p>點擊播放影片</p>
         </div>
+        <button id="sound-btn" class="hidden">
+            <span class="icon">🔇</span> <span class="text">Tap for Sound</span>
+        </button>
     </div>
 
     <a-scene
@@ -109,59 +189,53 @@
         vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
 
         <a-assets>
-            <video id="vid1" src="assets/1_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
-            <video id="vid2" src="assets/2_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
-            <video id="vid3" src="assets/3_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
-            <video id="vid4" src="assets/4_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
-            <video id="vid5" src="assets/5_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
-            <video id="vid6" src="assets/6_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
-            <video id="vid7" src="assets/7_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
-            <video id="vid8" src="assets/8_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
-            <video id="vid9" src="assets/9_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
-            <video id="vid10" src="assets/10_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
+            <video id="shared-video" playsinline webkit-playsinline loop="true" preload="auto" muted></video>
         </a-assets>
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-        <a-entity mindar-image-target="targetIndex: 0" class="ar-target" data-video="vid10">
-            <a-video src="#vid10" position="0 0 0" height="0.6667" width="1"></a-video>
+        <!-- MindAR Targets (invisible, used to trigger events) -->
+        <a-entity id="target0" mindar-image-target="targetIndex: 0" class="ar-target" data-video="assets/10_1.mp4"></a-entity>
+        <a-entity id="target1" mindar-image-target="targetIndex: 1" class="ar-target" data-video="assets/9_1.mp4"></a-entity>
+        <a-entity id="target2" mindar-image-target="targetIndex: 2" class="ar-target" data-video="assets/8_1.mp4"></a-entity>
+        <a-entity id="target3" mindar-image-target="targetIndex: 3" class="ar-target" data-video="assets/7_1.mp4"></a-entity>
+        <a-entity id="target4" mindar-image-target="targetIndex: 4" class="ar-target" data-video="assets/6_1.mp4"></a-entity>
+        <a-entity id="target5" mindar-image-target="targetIndex: 5" class="ar-target" data-video="assets/5_1.mp4"></a-entity>
+        <a-entity id="target6" mindar-image-target="targetIndex: 6" class="ar-target" data-video="assets/4_1.mp4"></a-entity>
+        <a-entity id="target7" mindar-image-target="targetIndex: 7" class="ar-target" data-video="assets/3_1.mp4"></a-entity>
+        <a-entity id="target8" mindar-image-target="targetIndex: 8" class="ar-target" data-video="assets/2_1.mp4"></a-entity>
+        <a-entity id="target9" mindar-image-target="targetIndex: 9" class="ar-target" data-video="assets/1_1.mp4"></a-entity>
+
+        <!-- Stabilized World-Space Video Containers -->
+        <a-entity id="videoContainer0" stabilizer="targetId: target0" visible="false">
+            <a-video src="#shared-video" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
-        <a-entity mindar-image-target="targetIndex: 1" class="ar-target" data-video="vid9">
-            <a-video src="#vid9" position="0 0 0" height="0.6667" width="1"></a-video>
+        <a-entity id="videoContainer1" stabilizer="targetId: target1" visible="false">
+            <a-video src="#shared-video" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
-        <a-entity mindar-image-target="targetIndex: 2" class="ar-target" data-video="vid8">
-            <a-video src="#vid8" position="0 0 0" height="0.6667" width="1"></a-video>
+        <a-entity id="videoContainer2" stabilizer="targetId: target2" visible="false">
+            <a-video src="#shared-video" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
-        <a-entity mindar-image-target="targetIndex: 3" class="ar-target" data-video="vid7">
-            <a-video src="#vid7" position="0 0 0" height="0.6667" width="1"></a-video>
+        <a-entity id="videoContainer3" stabilizer="targetId: target3" visible="false">
+            <a-video src="#shared-video" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
-        <a-entity mindar-image-target="targetIndex: 4" class="ar-target" data-video="vid6">
-            <a-video src="#vid6" position="0 0 0" height="0.6667" width="1"></a-video>
+        <a-entity id="videoContainer4" stabilizer="targetId: target4" visible="false">
+            <a-video src="#shared-video" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
-        <a-entity mindar-image-target="targetIndex: 5" class="ar-target" data-video="vid5">
-            <a-video src="#vid5" position="0 0 0" height="0.6667" width="1"></a-video>
+        <a-entity id="videoContainer5" stabilizer="targetId: target5" visible="false">
+            <a-video src="#shared-video" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
-        <a-entity mindar-image-target="targetIndex: 6" class="ar-target" data-video="vid4">
-            <a-video src="#vid4" position="0 0 0" height="0.6667" width="1"></a-video>
+        <a-entity id="videoContainer6" stabilizer="targetId: target6" visible="false">
+            <a-video src="#shared-video" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
-        <a-entity mindar-image-target="targetIndex: 7" class="ar-target" data-video="vid3">
-            <a-video src="#vid3" position="0 0 0" height="0.6667" width="1"></a-video>
+        <a-entity id="videoContainer7" stabilizer="targetId: target7" visible="false">
+            <a-video src="#shared-video" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
-        <a-entity mindar-image-target="targetIndex: 8" class="ar-target" data-video="vid2">
-            <a-video src="#vid2" position="0 0 0" height="0.6667" width="1"></a-video>
+        <a-entity id="videoContainer8" stabilizer="targetId: target8" visible="false">
+            <a-video src="#shared-video" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
-        <a-entity mindar-image-target="targetIndex: 9" class="ar-target" data-video="vid1">
-            <a-video src="#vid1" position="0 0 0" height="0.6667" width="1"></a-video>
+        <a-entity id="videoContainer9" stabilizer="targetId: target9" visible="false">
+            <a-video src="#shared-video" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
     </a-scene>
 
@@ -177,6 +251,8 @@
             const initText = document.querySelector('#init-text');
             const overlay = document.querySelector('#start-overlay');
             const indicator = document.querySelector('#scanning-indicator');
+            const sharedVideo = document.getElementById('shared-video');
+            const soundBtn = document.getElementById('sound-btn');
             
             let activeVid = null;
             let activeTargetIndex = null;
@@ -196,6 +272,48 @@
                 consoleEl.appendChild(line);
                 consoleEl.scrollTop = consoleEl.scrollHeight;
             }
+
+            // Mute / Unmute overlay controller
+            function toggleMute() {
+                if (!activeVid) return;
+                sharedVideo.muted = !sharedVideo.muted;
+                updateSoundButton();
+                logToScreen("Muted state toggled. Muted = " + sharedVideo.muted);
+            }
+
+            function updateSoundButton() {
+                if (!activeVid) {
+                    soundBtn.classList.add('hidden');
+                    return;
+                }
+                soundBtn.classList.remove('hidden');
+                const icon = soundBtn.querySelector('.icon');
+                const text = soundBtn.querySelector('.text');
+                if (sharedVideo.muted) {
+                    icon.textContent = "🔇";
+                    text.textContent = "Tap for Sound";
+                } else {
+                    icon.textContent = "🔊";
+                    text.textContent = "Sound On";
+                }
+            }
+
+            soundBtn.onclick = function (e) {
+                e.stopPropagation();
+                toggleMute();
+            };
+
+            // Global screen tap to unmute when video is actively running
+            window.addEventListener('click', (e) => {
+                if (overlay.style.display !== 'none') return;
+                // Prevent intercepting debug controls or standard buttons
+                if (e.target.closest('#debug-console') || e.target.closest('#sound-btn') || e.target.closest('#start-btn')) {
+                    return;
+                }
+                if (activeVid) {
+                    toggleMute();
+                }
+            });
 
             // Periodically check if controller is ready to fetch target dimensions and cache them
             let checkTargetsInterval = setInterval(() => {
@@ -240,28 +358,16 @@
                     logToScreen("Error starting system: " + e.message); 
                 }
 
-                // Unlock audio/video sequentially for mobile Safari to prevent hardware decoder limit errors
-                const videos = Array.from(document.querySelectorAll('a-assets video'));
-                let vIndex = 0;
-                function unlockNextVideo() {
-                    if (vIndex >= videos.length) {
-                        logToScreen("All video assets successfully unlocked sequentially.");
-                        return;
-                    }
-                    const v = videos[vIndex];
-                    v.play().then(() => { 
-                        v.pause(); 
-                        v.currentTime = 0; 
-                        logToScreen("Unlocked video asset: " + v.id);
-                        vIndex++;
-                        setTimeout(unlockNextVideo, 80); // 80ms delay between unlocks
+                // Unlock the single shared video element synchronously inside user event
+                if (sharedVideo) {
+                    sharedVideo.play().then(() => { 
+                        sharedVideo.pause(); 
+                        sharedVideo.currentTime = 0; 
+                        logToScreen("Shared video unlocked successfully.");
                     }).catch((err) => { 
-                        logToScreen("Unlock video failed for id " + v.id + ": " + err.message); 
-                        vIndex++;
-                        setTimeout(unlockNextVideo, 80);
+                        logToScreen("Shared video unlock failed: " + err.message); 
                     });
                 }
-                unlockNextVideo();
 
                 // Check background camera video element
                 setTimeout(() => {
@@ -279,19 +385,15 @@
                 const targetIndexAttr = t.getAttribute('mindar-image-target');
                 const targetIndexMatch = targetIndexAttr.match(/targetIndex:\s*(\d+)/);
                 const targetIndex = targetIndexMatch ? parseInt(targetIndexMatch[1]) : 0;
-                const aVideo = t.querySelector('a-video');
+                
+                const videoContainer = document.getElementById("videoContainer" + targetIndex);
+                const aVideo = videoContainer ? videoContainer.querySelector('a-video') : null;
 
                 t.addEventListener('targetFound', () => {
-                    const vidId = t.getAttribute('data-video');
-                    logToScreen("Target found! index=" + targetIndex + ", video=" + vidId);
+                    const videoSrc = t.getAttribute('data-video');
+                    logToScreen("Target found! index=" + targetIndex + ", video=" + videoSrc);
                     
                     indicator.classList.add('hidden');
-                    const v = document.getElementById(vidId);
-                    if (!v) {
-                        logToScreen("Error: Video element #" + vidId + " not found.");
-                        return;
-                    }
-
                     activeTargetIndex = targetIndex;
 
                     // Determine aspect ratio from targets or fall back
@@ -321,11 +423,16 @@
                         aVideo.setAttribute('height', height.toString());
                     }
 
-                    activeVid = v;
+                    // For guaranteed autoplay on iOS Safari, ensure we load muted. 
+                    // User can tap the screen or speaker icon to unmute.
+                    sharedVideo.muted = true;
+                    sharedVideo.src = videoSrc;
+                    logToScreen("Loading and playing video source: " + videoSrc);
+                    activeVid = sharedVideo;
                     
-                    logToScreen("Attempting to play video: " + vidId);
-                    v.play().then(() => {
-                        logToScreen("Playback started successfully.");
+                    sharedVideo.play().then(() => {
+                        logToScreen("Playback started successfully (muted).");
+                        updateSoundButton();
                     }).catch(err => {
                         logToScreen("Play blocked: " + err.message + ". Showing Tap to Play overlay.");
                         document.querySelector('#tap-to-play').classList.remove('hidden');
@@ -337,17 +444,12 @@
                     indicator.classList.remove('hidden');
                     document.querySelector('#tap-to-play').classList.add('hidden');
                     
-                    const vidId = t.getAttribute('data-video');
-                    const v = document.getElementById(vidId);
-                    if (v) {
-                        v.pause();
-                    }
-                    
                     if (activeTargetIndex === targetIndex) {
+                        sharedVideo.pause();
+                        sharedVideo.src = "";
                         activeTargetIndex = null;
-                    }
-                    if (activeVid === v) {
                         activeVid = null;
+                        updateSoundButton();
                     }
                 });
             });
@@ -355,8 +457,10 @@
             document.querySelector('#tap-to-play').onclick = function () {
                 if (activeVid) {
                     logToScreen("Tap to play clicked. Forcing playback...");
+                    sharedVideo.muted = false; // Play with audio on explicit tap-to-play click
                     activeVid.play().then(() => {
                         logToScreen("Forced playback succeeded.");
+                        updateSoundButton();
                     }).catch(err => {
                         logToScreen("Forced play failed: " + err.message);
                     });
