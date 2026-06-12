@@ -12,21 +12,21 @@
         // Register Stabilizer component for A-Frame
         AFRAME.registerComponent('stabilizer', {
             schema: {
-                targetId: {type: 'string'},
-                lerpFactor: {type: 'number', default: 0.15} // Responsive baseline tracking
+                targetId: { type: 'string' },
+                lerpFactor: { type: 'number', default: 0.15 } // Responsive baseline tracking
             },
             init: function () {
                 this.targetEl = document.getElementById(this.data.targetId);
                 this.found = false;
-                
+
                 this.currPos = new THREE.Vector3();
                 this.currQuat = new THREE.Quaternion();
                 this.currScale = new THREE.Vector3();
-                
+
                 this.targetPos = new THREE.Vector3();
                 this.targetQuat = new THREE.Quaternion();
                 this.targetScale = new THREE.Vector3();
-                
+
                 this.firstTime = true;
 
                 if (this.targetEl) {
@@ -43,14 +43,14 @@
             },
             tick: function () {
                 if (!this.found || !this.targetEl) return;
-                
+
                 const targetObj = this.targetEl.object3D;
                 const containerObj = this.el.object3D;
-                
+
                 // Force matrix recalculation to get the current frame's true position and avoid lagging a frame behind
                 targetObj.updateMatrixWorld(true);
                 targetObj.matrixWorld.decompose(this.targetPos, this.targetQuat, this.targetScale);
-                
+
                 if (this.firstTime) {
                     this.currPos.copy(this.targetPos);
                     this.currQuat.copy(this.targetQuat);
@@ -60,10 +60,10 @@
                     // Adaptive filtering: scale down interpolation factor for minor movements (high frequency tracking jitter)
                     const dist = this.currPos.distanceTo(this.targetPos);
                     const angle = this.currQuat.angleTo(this.targetQuat);
-                    
+
                     let pFactor = this.data.lerpFactor;
                     let rFactor = this.data.lerpFactor;
-                    
+
                     if (dist < 0.08) {
                         pFactor = this.data.lerpFactor * (dist / 0.08);
                         if (pFactor < 0.015) pFactor = 0.015; // Minimum step to avoid complete lock
@@ -72,12 +72,12 @@
                         rFactor = this.data.lerpFactor * (angle / 0.12);
                         if (rFactor < 0.015) rFactor = 0.015;
                     }
-                    
+
                     this.currPos.lerp(this.targetPos, pFactor);
                     this.currScale.lerp(this.targetScale, this.data.lerpFactor);
                     this.currQuat.slerp(this.targetQuat, rFactor);
                 }
-                
+
                 // Apply smoothed values
                 containerObj.position.copy(this.currPos);
                 containerObj.quaternion.copy(this.currQuat);
@@ -172,7 +172,9 @@
     <div id="ui-overlay">
         <div id="scanning-indicator" class="hidden">
             <div class="scanner-frame"></div>
-            <p>請將相機對準明信片<br><span style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: normal; display: block; margin-top: 5px;">請確保明信片直向放置 (Don't rotate card)</span></p>
+            <p>請將相機對準明信片<br><span
+                    style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: normal; display: block; margin-top: 5px;">請確保明信片直向放置
+                    (Don't rotate card)</span></p>
         </div>
         <div id="tap-to-play" class="overlay hidden" style="background: rgba(0,0,0,0.8); z-index: 10001;">
             <div style="font-size: 60px;">▶️</div>
@@ -181,6 +183,17 @@
         <button id="sound-btn" class="hidden">
             <span class="icon">🔇</span> <span class="text">Tap for Sound</span>
         </button>
+
+        <!-- Video Size Adjustment Panel: always visible during scanning, drag to fit video to photo -->
+        <div id="video-adjust-panel"
+            style="position: absolute; bottom: 30vh; width: 100%; text-align: center; z-index: 10000; pointer-events: auto; display: none;">
+            <div style="color:white; font-size:13px; font-weight:bold; text-shadow:0 1px 3px black; margin-bottom:4px;">
+                Adjust Video Size 🔄</div>
+            <input type="range" id="video-scale-slider" min="0.5" max="1.3" step="0.005" value="1.0"
+                style="width: 65%; accent-color: #00f2fe;">
+            <div style="color:#00f2fe; font-size:12px; margin-top:2px;">Scale: <span id="scale-value-label">1.00</span>
+            </div>
+        </div>
     </div>
 
     <a-scene
@@ -195,16 +208,26 @@
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
         <!-- MindAR Targets (invisible, used to trigger events) -->
-        <a-entity id="target0" mindar-image-target="targetIndex: 0" class="ar-target" data-video="assets/10_1.mp4"></a-entity>
-        <a-entity id="target1" mindar-image-target="targetIndex: 1" class="ar-target" data-video="assets/9_1.mp4"></a-entity>
-        <a-entity id="target2" mindar-image-target="targetIndex: 2" class="ar-target" data-video="assets/8_1.mp4"></a-entity>
-        <a-entity id="target3" mindar-image-target="targetIndex: 3" class="ar-target" data-video="assets/7_1.mp4"></a-entity>
-        <a-entity id="target4" mindar-image-target="targetIndex: 4" class="ar-target" data-video="assets/6_1.mp4"></a-entity>
-        <a-entity id="target5" mindar-image-target="targetIndex: 5" class="ar-target" data-video="assets/5_1.mp4"></a-entity>
-        <a-entity id="target6" mindar-image-target="targetIndex: 6" class="ar-target" data-video="assets/4_1.mp4"></a-entity>
-        <a-entity id="target7" mindar-image-target="targetIndex: 7" class="ar-target" data-video="assets/3_1.mp4"></a-entity>
-        <a-entity id="target8" mindar-image-target="targetIndex: 8" class="ar-target" data-video="assets/2_1.mp4"></a-entity>
-        <a-entity id="target9" mindar-image-target="targetIndex: 9" class="ar-target" data-video="assets/1_1.mp4"></a-entity>
+        <a-entity id="target0" mindar-image-target="targetIndex: 0" class="ar-target"
+            data-video="assets/10_1.mp4"></a-entity>
+        <a-entity id="target1" mindar-image-target="targetIndex: 1" class="ar-target"
+            data-video="assets/9_1.mp4"></a-entity>
+        <a-entity id="target2" mindar-image-target="targetIndex: 2" class="ar-target"
+            data-video="assets/8_1.mp4"></a-entity>
+        <a-entity id="target3" mindar-image-target="targetIndex: 3" class="ar-target"
+            data-video="assets/7_1.mp4"></a-entity>
+        <a-entity id="target4" mindar-image-target="targetIndex: 4" class="ar-target"
+            data-video="assets/6_1.mp4"></a-entity>
+        <a-entity id="target5" mindar-image-target="targetIndex: 5" class="ar-target"
+            data-video="assets/5_1.mp4"></a-entity>
+        <a-entity id="target6" mindar-image-target="targetIndex: 6" class="ar-target"
+            data-video="assets/4_1.mp4"></a-entity>
+        <a-entity id="target7" mindar-image-target="targetIndex: 7" class="ar-target"
+            data-video="assets/3_1.mp4"></a-entity>
+        <a-entity id="target8" mindar-image-target="targetIndex: 8" class="ar-target"
+            data-video="assets/2_1.mp4"></a-entity>
+        <a-entity id="target9" mindar-image-target="targetIndex: 9" class="ar-target"
+            data-video="assets/1_1.mp4"></a-entity>
 
         <!-- Stabilized World-Space Video Containers -->
         <a-entity id="videoContainer0" stabilizer="targetId: target0" visible="false">
@@ -240,8 +263,11 @@
     </a-scene>
 
     <div id="debug-console">
-        <button class="debug-clear-btn" onclick="document.querySelectorAll('.debug-line').forEach(el => el.remove())">CLEAR</button>
-        <div style="font-weight: bold; border-bottom: 1px dashed var(--primary-color); padding-bottom: 4px; margin-bottom: 8px;">MOBILE DEBUG CONSOLE</div>
+        <button class="debug-clear-btn"
+            onclick="document.querySelectorAll('.debug-line').forEach(el => el.remove())">CLEAR</button>
+        <div
+            style="font-weight: bold; border-bottom: 1px dashed var(--primary-color); padding-bottom: 4px; margin-bottom: 8px;">
+            MOBILE DEBUG CONSOLE</div>
     </div>
 
     <script>
@@ -253,7 +279,7 @@
             const indicator = document.querySelector('#scanning-indicator');
             const sharedVideo = document.getElementById('shared-video');
             const soundBtn = document.getElementById('sound-btn');
-            
+
             let activeVid = null;
             let activeTargetIndex = null;
             let targetDimensions = {};
@@ -264,10 +290,10 @@
                 if (!consoleEl) return;
                 const line = document.createElement('div');
                 line.className = 'debug-line';
-                
+
                 const now = new Date();
                 const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
-                
+
                 line.innerHTML = `<span class="debug-time">[${timeStr}]</span>${msg}`;
                 consoleEl.appendChild(line);
                 consoleEl.scrollTop = consoleEl.scrollHeight;
@@ -323,13 +349,16 @@
                         clearInterval(checkTargetsInterval);
                         const targets = arSystem.controller.imageTargets;
                         logToScreen("MindAR loaded " + targets.length + " targets dimensions.");
-                        targets.forEach(t => {
-                            targetDimensions[t.targetIndex] = {
-                                width: t.width,
-                                height: t.height,
-                                aspectRatio: t.width / t.height
+                        targets.forEach((t, idx) => {
+                            // Determine width/height depending on how MindAR structures the target object
+                            const w = t.width || (t.dimensions ? t.dimensions[0] : 1);
+                            const h = t.height || (t.dimensions ? t.dimensions[1] : 0.6667);
+                            targetDimensions[idx] = {
+                                width: w,
+                                height: h,
+                                aspectRatio: w / h
                             };
-                            logToScreen("Target " + t.targetIndex + ": size=" + t.width + "x" + t.height + ", ratio=" + (t.width/t.height).toFixed(3));
+                            logToScreen("Target " + idx + ": size=" + w + "x" + h + ", ratio=" + (w / h).toFixed(3));
                         });
                     }
                 } catch (e) {
@@ -354,18 +383,18 @@
                         arSystem.start();
                         logToScreen("AR System started manually.");
                     }
-                } catch (e) { 
-                    logToScreen("Error starting system: " + e.message); 
+                } catch (e) {
+                    logToScreen("Error starting system: " + e.message);
                 }
 
                 // Unlock the single shared video element synchronously inside user event
                 if (sharedVideo) {
-                    sharedVideo.play().then(() => { 
-                        sharedVideo.pause(); 
-                        sharedVideo.currentTime = 0; 
+                    sharedVideo.play().then(() => {
+                        sharedVideo.pause();
+                        sharedVideo.currentTime = 0;
                         logToScreen("Shared video unlocked successfully.");
-                    }).catch((err) => { 
-                        logToScreen("Shared video unlock failed: " + err.message); 
+                    }).catch((err) => {
+                        logToScreen("Shared video unlock failed: " + err.message);
                     });
                 }
 
@@ -385,43 +414,37 @@
                 const targetIndexAttr = t.getAttribute('mindar-image-target');
                 const targetIndexMatch = targetIndexAttr.match(/targetIndex:\s*(\d+)/);
                 const targetIndex = targetIndexMatch ? parseInt(targetIndexMatch[1]) : 0;
-                
+
                 const videoContainer = document.getElementById("videoContainer" + targetIndex);
                 const aVideo = videoContainer ? videoContainer.querySelector('a-video') : null;
 
                 t.addEventListener('targetFound', () => {
                     const videoSrc = t.getAttribute('data-video');
                     logToScreen("Target found! index=" + targetIndex + ", video=" + videoSrc);
-                    
+
                     indicator.classList.add('hidden');
                     activeTargetIndex = targetIndex;
 
-                    // Determine aspect ratio from targets or fall back
-                    let height = 0.6667; // fallback height (1.5 aspect ratio)
+                    let P_h = 0.6667; // fallback height
                     if (targetDimensions[targetIndex]) {
                         const dims = targetDimensions[targetIndex];
-                        height = dims.height / dims.width; // Height relative to width=1
-                        logToScreen("Setting video dimensions: width=1, height=" + height.toFixed(4) + " (based on target " + dims.width + "x" + dims.height + ")");
-                    } else {
-                        logToScreen("Target dimensions not cached, reading dynamic controller data...");
-                        try {
-                            const arSystem = sceneEl.systems['mindar-image-system'];
-                            if (arSystem && arSystem.controller && arSystem.controller.imageTargets) {
-                                const targetObj = arSystem.controller.imageTargets[targetIndex];
-                                if (targetObj) {
-                                    height = targetObj.height / targetObj.width;
-                                    logToScreen("Dynamic target size: " + targetObj.width + "x" + targetObj.height);
-                                }
-                            }
-                        } catch (err) {
-                            logToScreen("Error reading dynamic target: " + err.message);
-                        }
+                        P_h = dims.height / dims.width;
                     }
+
+                    // Load saved scale or default to 1.0
+                    const savedScale = parseFloat(localStorage.getItem('arVideoScale') || '1.0');
+                    document.getElementById('video-scale-slider').value = savedScale;
+                    document.getElementById('scale-value-label').textContent = savedScale.toFixed(2);
 
                     if (aVideo) {
                         aVideo.setAttribute('width', '1');
-                        aVideo.setAttribute('height', height.toString());
+                        aVideo.setAttribute('height', P_h.toString());
+                        aVideo.setAttribute('scale', `${savedScale} ${savedScale} 1`);
+                        logToScreen(`Video shape: 1x${P_h.toFixed(3)}, scale: ${savedScale}`);
                     }
+
+                    document.getElementById('video-adjust-panel').style.display = 'block';
+
 
                     // For guaranteed autoplay on iOS Safari, ensure we load muted. 
                     // User can tap the screen or speaker icon to unmute.
@@ -429,7 +452,7 @@
                     sharedVideo.src = videoSrc;
                     logToScreen("Loading and playing video source: " + videoSrc);
                     activeVid = sharedVideo;
-                    
+
                     sharedVideo.play().then(() => {
                         logToScreen("Playback started successfully (muted).");
                         updateSoundButton();
@@ -442,8 +465,9 @@
                 t.addEventListener('targetLost', () => {
                     logToScreen("Target lost. index=" + targetIndex);
                     indicator.classList.remove('hidden');
+                    document.getElementById('video-adjust-panel').style.display = 'none';
                     document.querySelector('#tap-to-play').classList.add('hidden');
-                    
+
                     if (activeTargetIndex === targetIndex) {
                         sharedVideo.pause();
                         sharedVideo.src = "";
@@ -452,6 +476,18 @@
                         updateSoundButton();
                     }
                 });
+            });
+
+            // Slider: live-adjust video scale and save to localStorage
+            document.getElementById('video-scale-slider').addEventListener('input', function (e) {
+                const val = parseFloat(e.target.value);
+                document.getElementById('scale-value-label').textContent = val.toFixed(2);
+                localStorage.setItem('arVideoScale', val.toString());
+                if (activeTargetIndex !== null) {
+                    const vc = document.getElementById("videoContainer" + activeTargetIndex);
+                    const av = vc ? vc.querySelector('a-video') : null;
+                    if (av) av.setAttribute('scale', `${val} ${val} 1`);
+                }
             });
 
             document.querySelector('#tap-to-play').onclick = function () {
