@@ -128,12 +128,7 @@
             <video id="vid9" src="assets/9_1.mp4" playsinline webkit-playsinline loop="false"
                 preload="metadata"></video>
             <video id="vid10" src="assets/10_1.mp4" playsinline webkit-playsinline loop="false"
-                preload="metadata"></video>
-        </a-assets>
-
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-        <a-entity mindar-image-target="targetIndex: 0" class="ar-target" data-video="vid10">
+                preload="met        <a-entity mindar-image-target="targetIndex: 0" class="ar-target" data-video="vid10">
             <a-video src="#vid10" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 1" class="ar-target" data-video="vid9">
@@ -165,10 +160,6 @@
         </a-entity>
     </a-scene>
 
-    <div id="video-overlay-container">
-        <video id="overlay-video" playsinline webkit-playsinline loop="false"></video>
-    </div>
-
     <div id="debug-console">
         <button class="debug-clear-btn" onclick="document.querySelectorAll('.debug-line').forEach(el => el.remove())">CLEAR</button>
         <div style="font-weight: bold; border-bottom: 1px dashed var(--primary-color); padding-bottom: 4px; margin-bottom: 8px;">MOBILE DEBUG CONSOLE</div>
@@ -181,9 +172,6 @@
             const initText = document.querySelector('#init-text');
             const overlay = document.querySelector('#start-overlay');
             const indicator = document.querySelector('#scanning-indicator');
-            
-            const overlayContainer = document.getElementById('video-overlay-container');
-            const overlayVideo = document.getElementById('overlay-video');
             
             let activeVid = null;
             let activeTargetIndex = null;
@@ -204,60 +192,37 @@
                 consoleEl.scrollTop = consoleEl.scrollHeight;
             }
 
-            function resizeVideoOverlay(aspectRatio) {
-                if (!overlayContainer) return;
-                
-                const maxWidth = window.innerWidth * 0.9;
-                const maxHeight = window.innerHeight * 0.6; // Avoid overlapping debug panel
-                
-                let targetWidth = maxWidth;
-                let targetHeight = maxWidth / aspectRatio;
-                
-                if (targetHeight > maxHeight) {
-                    targetHeight = maxHeight;
-                    targetWidth = maxHeight * aspectRatio;
-                }
-                
-                overlayContainer.style.width = targetWidth + 'px';
-                overlayContainer.style.height = targetHeight + 'px';
-                
-                logToScreen("Resized overlay: " + targetWidth.toFixed(0) + "x" + targetHeight.toFixed(0) + " (Aspect Ratio: " + aspectRatio.toFixed(3) + ")");
-            }
-
-            function onReady() {
-                initText.innerText = "系統已準備就緒";
-                logToScreen("MindAR System: Ready");
-                
-                setTimeout(() => {
-                    try {
-                        const arSystem = sceneEl.systems['mindar-image-system'];
-                        if (arSystem && arSystem.controller && arSystem.controller.imageTargets) {
-                            const targets = arSystem.controller.imageTargets;
-                            logToScreen("Found " + targets.length + " image targets in controller.");
-                            targets.forEach(t => {
-                                targetDimensions[t.targetIndex] = {
-                                    width: t.width,
-                                    height: t.height,
-                                    aspectRatio: t.width / t.height
-                                };
-                                logToScreen("Target " + t.targetIndex + ": width=" + t.width.toFixed(2) + ", height=" + t.height.toFixed(2) + ", AR=" + (t.width/t.height).toFixed(3));
-                            });
-                        } else {
-                            logToScreen("Warning: controller or imageTargets not found.");
-                        }
-                    } catch (e) {
-                        logToScreen("Error reading targets: " + e.message);
+            // Periodically check if controller is ready to fetch target dimensions and cache them
+            let checkTargetsInterval = setInterval(() => {
+                try {
+                    const arSystem = sceneEl.systems['mindar-image-system'];
+                    if (arSystem && arSystem.controller && arSystem.controller.imageTargets && arSystem.controller.imageTargets.length > 0) {
+                        clearInterval(checkTargetsInterval);
+                        const targets = arSystem.controller.imageTargets;
+                        logToScreen("MindAR loaded " + targets.length + " targets dimensions.");
+                        targets.forEach(t => {
+                            targetDimensions[t.targetIndex] = {
+                                width: t.width,
+                                height: t.height,
+                                aspectRatio: t.width / t.height
+                            };
+                            logToScreen("Target " + t.targetIndex + ": size=" + t.width + "x" + t.height + ", ratio=" + (t.width/t.height).toFixed(3));
+                        });
                     }
-                }, 1000);
-            }
+                } catch (e) {
+                    // Wait for initialization
+                }
+            }, 100);
 
-            sceneEl.addEventListener('ready', onReady);
+            sceneEl.addEventListener('ready', () => {
+                logToScreen("MindAR ready event fired.");
+            });
 
             startBtn.onclick = function () {
                 overlay.style.opacity = '0';
                 setTimeout(() => overlay.style.display = 'none', 500);
                 indicator.classList.remove('hidden');
-                logToScreen("Scanning started");
+                logToScreen("Scanning started.");
 
                 // Ensure engine start
                 try {
@@ -270,11 +235,12 @@
                     logToScreen("Error starting system: " + e.message); 
                 }
 
-                // Unlock audio/video for mobile browsers
-                document.querySelectorAll('video').forEach(v => {
+                // Unlock audio/video for mobile browsers (only local asset videos)
+                document.querySelectorAll('a-assets video').forEach(v => {
                     v.play().then(() => { 
                         v.pause(); 
                         v.currentTime = 0; 
+                        logToScreen("Unlocked video asset: " + v.id);
                     }).catch((err) => { 
                         logToScreen("Unlock video failed for id " + v.id + ": " + err.message); 
                     });
@@ -296,6 +262,7 @@
                 const targetIndexAttr = t.getAttribute('mindar-image-target');
                 const targetIndexMatch = targetIndexAttr.match(/targetIndex:\s*(\d+)/);
                 const targetIndex = targetIndexMatch ? parseInt(targetIndexMatch[1]) : 0;
+                const aVideo = t.querySelector('a-video');
 
                 t.addEventListener('targetFound', () => {
                     const vidId = t.getAttribute('data-video');
@@ -311,9 +278,11 @@
                     activeTargetIndex = targetIndex;
 
                     // Determine aspect ratio from targets or fall back
-                    let ar = 1.5;
+                    let height = 0.6667; // fallback height (1.5 aspect ratio)
                     if (targetDimensions[targetIndex]) {
-                        ar = targetDimensions[targetIndex].aspectRatio;
+                        const dims = targetDimensions[targetIndex];
+                        height = dims.height / dims.width; // Height relative to width=1
+                        logToScreen("Setting video dimensions: width=1, height=" + height.toFixed(4) + " (based on target " + dims.width + "x" + dims.height + ")");
                     } else {
                         logToScreen("Target dimensions not cached, reading dynamic controller data...");
                         try {
@@ -321,7 +290,7 @@
                             if (arSystem && arSystem.controller && arSystem.controller.imageTargets) {
                                 const targetObj = arSystem.controller.imageTargets[targetIndex];
                                 if (targetObj) {
-                                    ar = targetObj.width / targetObj.height;
+                                    height = targetObj.height / targetObj.width;
                                     logToScreen("Dynamic target size: " + targetObj.width + "x" + targetObj.height);
                                 }
                             }
@@ -330,16 +299,16 @@
                         }
                     }
 
-                    resizeVideoOverlay(ar);
+                    if (aVideo) {
+                        aVideo.setAttribute('width', '1');
+                        aVideo.setAttribute('height', height.toString());
+                        aVideo.setAttribute('visible', 'true');
+                    }
 
-                    const videoSrc = v.getAttribute('src');
-                    overlayVideo.src = videoSrc;
+                    activeVid = v;
                     
-                    activeVid = overlayVideo;
-                    overlayContainer.classList.add('show');
-                    
-                    logToScreen("Attempting to play video: " + videoSrc);
-                    overlayVideo.play().then(() => {
+                    logToScreen("Attempting to play video: " + vidId);
+                    v.play().then(() => {
                         logToScreen("Playback started successfully.");
                     }).catch(err => {
                         logToScreen("Play blocked: " + err.message + ". Showing Tap to Play overlay.");
@@ -352,23 +321,29 @@
                     indicator.classList.remove('hidden');
                     document.querySelector('#tap-to-play').classList.add('hidden');
                     
-                    overlayContainer.classList.remove('show');
-                    overlayVideo.pause();
-                    overlayVideo.src = "";
+                    if (aVideo) {
+                        aVideo.setAttribute('visible', 'false');
+                    }
+
+                    const vidId = t.getAttribute('data-video');
+                    const v = document.getElementById(vidId);
+                    if (v) {
+                        v.pause();
+                    }
                     
                     if (activeTargetIndex === targetIndex) {
                         activeTargetIndex = null;
                     }
-                    if (activeVid === overlayVideo) {
+                    if (activeVid === v) {
                         activeVid = null;
                     }
                 });
             });
 
             document.querySelector('#tap-to-play').onclick = function () {
-                if (overlayVideo) {
+                if (activeVid) {
                     logToScreen("Tap to play clicked. Forcing playback...");
-                    overlayVideo.play().then(() => {
+                    activeVid.play().then(() => {
                         logToScreen("Forced playback succeeded.");
                     }).catch(err => {
                         logToScreen("Forced play failed: " + err.message);
@@ -376,16 +351,6 @@
                 }
                 this.classList.add('hidden');
             };
-
-            window.addEventListener('resize', () => {
-                if (overlayContainer.classList.contains('show') && activeTargetIndex !== null) {
-                    let ar = 1.5;
-                    if (targetDimensions[activeTargetIndex]) {
-                        ar = targetDimensions[activeTargetIndex].aspectRatio;
-                    }
-                    resizeVideoOverlay(ar);
-                }
-            });
         };
     </script>
 </body>
