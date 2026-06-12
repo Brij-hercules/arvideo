@@ -95,7 +95,7 @@
     <div id="ui-overlay">
         <div id="scanning-indicator" class="hidden">
             <div class="scanner-frame"></div>
-            <p>請將相機對準明信片</p>
+            <p>請將相機對準明信片<br><span style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: normal; display: block; margin-top: 5px;">請確保明信片直向放置 (Don't rotate card)</span></p>
         </div>
         <div id="tap-to-play" class="overlay hidden" style="background: rgba(0,0,0,0.8); z-index: 10001;">
             <div style="font-size: 60px;">▶️</div>
@@ -134,34 +134,34 @@
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
         <a-entity mindar-image-target="targetIndex: 0" class="ar-target" data-video="vid10">
-            <a-video src="#vid10" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
+            <a-video src="#vid10" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 1" class="ar-target" data-video="vid9">
-            <a-video src="#vid9" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
+            <a-video src="#vid9" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 2" class="ar-target" data-video="vid8">
-            <a-video src="#vid8" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
+            <a-video src="#vid8" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 3" class="ar-target" data-video="vid7">
-            <a-video src="#vid7" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
+            <a-video src="#vid7" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 4" class="ar-target" data-video="vid6">
-            <a-video src="#vid6" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
+            <a-video src="#vid6" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 5" class="ar-target" data-video="vid5">
-            <a-video src="#vid5" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
+            <a-video src="#vid5" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 6" class="ar-target" data-video="vid4">
-            <a-video src="#vid4" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
+            <a-video src="#vid4" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 7" class="ar-target" data-video="vid3">
-            <a-video src="#vid3" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
+            <a-video src="#vid3" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 8" class="ar-target" data-video="vid2">
-            <a-video src="#vid2" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
+            <a-video src="#vid2" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 9" class="ar-target" data-video="vid1">
-            <a-video src="#vid1" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
+            <a-video src="#vid1" position="0 0 0" height="0.6667" width="1"></a-video>
         </a-entity>
     </a-scene>
 
@@ -240,16 +240,28 @@
                     logToScreen("Error starting system: " + e.message); 
                 }
 
-                // Unlock audio/video for mobile browsers (only local asset videos)
-                document.querySelectorAll('a-assets video').forEach(v => {
+                // Unlock audio/video sequentially for mobile Safari to prevent hardware decoder limit errors
+                const videos = Array.from(document.querySelectorAll('a-assets video'));
+                let vIndex = 0;
+                function unlockNextVideo() {
+                    if (vIndex >= videos.length) {
+                        logToScreen("All video assets successfully unlocked sequentially.");
+                        return;
+                    }
+                    const v = videos[vIndex];
                     v.play().then(() => { 
                         v.pause(); 
                         v.currentTime = 0; 
                         logToScreen("Unlocked video asset: " + v.id);
+                        vIndex++;
+                        setTimeout(unlockNextVideo, 80); // 80ms delay between unlocks
                     }).catch((err) => { 
                         logToScreen("Unlock video failed for id " + v.id + ": " + err.message); 
+                        vIndex++;
+                        setTimeout(unlockNextVideo, 80);
                     });
-                });
+                }
+                unlockNextVideo();
 
                 // Check background camera video element
                 setTimeout(() => {
@@ -307,7 +319,6 @@
                     if (aVideo) {
                         aVideo.setAttribute('width', '1');
                         aVideo.setAttribute('height', height.toString());
-                        aVideo.setAttribute('visible', 'true');
                     }
 
                     activeVid = v;
@@ -326,10 +337,6 @@
                     indicator.classList.remove('hidden');
                     document.querySelector('#tap-to-play').classList.add('hidden');
                     
-                    if (aVideo) {
-                        aVideo.setAttribute('visible', 'false');
-                    }
-
                     const vidId = t.getAttribute('data-video');
                     const v = document.getElementById(vidId);
                     if (v) {
