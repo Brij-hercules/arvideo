@@ -176,6 +176,22 @@
 
             function onReady() {
                 initText.innerText = "系統已準備就緒";
+                setTimeout(() => {
+                    try {
+                        const arSystem = sceneEl.systems['mindar-image-system'];
+                        if (arSystem && arSystem.controller && arSystem.controller.imageTargets) {
+                            console.log("MY_TARGETS_DUMP:", JSON.stringify(arSystem.controller.imageTargets.map(t => ({
+                                targetIndex: t.targetIndex,
+                                width: t.width,
+                                height: t.height
+                            }))));
+                        } else {
+                            console.log("MY_TARGETS_DUMP: controller or imageTargets not found");
+                        }
+                    } catch (e) {
+                        console.error("Error logging targets:", e);
+                    }
+                }, 1000);
             }
 
             sceneEl.addEventListener('ready', onReady);
