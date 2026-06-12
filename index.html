@@ -134,36 +134,45 @@
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
         <a-entity mindar-image-target="targetIndex: 0" class="ar-target" data-video="vid10">
-            <a-video src="#vid10" position="0 0 0" height="0.6667" width="1"></a-video>
+            <a-video src="#vid10" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 1" class="ar-target" data-video="vid9">
-            <a-video src="#vid9" position="0 0 0" height="0.6667" width="1"></a-video>
+            <a-video src="#vid9" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 2" class="ar-target" data-video="vid8">
-            <a-video src="#vid8" position="0 0 0" height="0.6667" width="1"></a-video>
+            <a-video src="#vid8" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 3" class="ar-target" data-video="vid7">
-            <a-video src="#vid7" position="0 0 0" height="0.6667" width="1"></a-video>
+            <a-video src="#vid7" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 4" class="ar-target" data-video="vid6">
-            <a-video src="#vid6" position="0 0 0" height="0.6667" width="1"></a-video>
+            <a-video src="#vid6" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 5" class="ar-target" data-video="vid5">
-            <a-video src="#vid5" position="0 0 0" height="0.6667" width="1"></a-video>
+            <a-video src="#vid5" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 6" class="ar-target" data-video="vid4">
-            <a-video src="#vid4" position="0 0 0" height="0.6667" width="1"></a-video>
+            <a-video src="#vid4" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 7" class="ar-target" data-video="vid3">
-            <a-video src="#vid3" position="0 0 0" height="0.6667" width="1"></a-video>
+            <a-video src="#vid3" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 8" class="ar-target" data-video="vid2">
-            <a-video src="#vid2" position="0 0 0" height="0.6667" width="1"></a-video>
+            <a-video src="#vid2" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
         <a-entity mindar-image-target="targetIndex: 9" class="ar-target" data-video="vid1">
-            <a-video src="#vid1" position="0 0 0" height="0.6667" width="1"></a-video>
+            <a-video src="#vid1" position="0 0 0" height="0.6667" width="1" visible="false"></a-video>
         </a-entity>
     </a-scene>
+
+    <div id="video-overlay-container">
+        <video id="overlay-video" playsinline webkit-playsinline loop="false"></video>
+    </div>
+
+    <div id="debug-console">
+        <button class="debug-clear-btn" onclick="document.querySelectorAll('.debug-line').forEach(el => el.remove())">CLEAR</button>
+        <div style="font-weight: bold; border-bottom: 1px dashed var(--primary-color); padding-bottom: 4px; margin-bottom: 8px;">MOBILE DEBUG CONSOLE</div>
+    </div>
 
     <script>
         window.onload = function () {
@@ -172,24 +181,72 @@
             const initText = document.querySelector('#init-text');
             const overlay = document.querySelector('#start-overlay');
             const indicator = document.querySelector('#scanning-indicator');
+            
+            const overlayContainer = document.getElementById('video-overlay-container');
+            const overlayVideo = document.getElementById('overlay-video');
+            
             let activeVid = null;
+            let activeTargetIndex = null;
+            let targetDimensions = {};
+
+            function logToScreen(msg) {
+                console.log("[DEBUG]", msg);
+                const consoleEl = document.getElementById('debug-console');
+                if (!consoleEl) return;
+                const line = document.createElement('div');
+                line.className = 'debug-line';
+                
+                const now = new Date();
+                const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+                
+                line.innerHTML = `<span class="debug-time">[${timeStr}]</span>${msg}`;
+                consoleEl.appendChild(line);
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            }
+
+            function resizeVideoOverlay(aspectRatio) {
+                if (!overlayContainer) return;
+                
+                const maxWidth = window.innerWidth * 0.9;
+                const maxHeight = window.innerHeight * 0.6; // Avoid overlapping debug panel
+                
+                let targetWidth = maxWidth;
+                let targetHeight = maxWidth / aspectRatio;
+                
+                if (targetHeight > maxHeight) {
+                    targetHeight = maxHeight;
+                    targetWidth = maxHeight * aspectRatio;
+                }
+                
+                overlayContainer.style.width = targetWidth + 'px';
+                overlayContainer.style.height = targetHeight + 'px';
+                
+                logToScreen("Resized overlay: " + targetWidth.toFixed(0) + "x" + targetHeight.toFixed(0) + " (Aspect Ratio: " + aspectRatio.toFixed(3) + ")");
+            }
 
             function onReady() {
                 initText.innerText = "系統已準備就緒";
+                logToScreen("MindAR System: Ready");
+                
                 setTimeout(() => {
                     try {
                         const arSystem = sceneEl.systems['mindar-image-system'];
                         if (arSystem && arSystem.controller && arSystem.controller.imageTargets) {
-                            console.log("MY_TARGETS_DUMP:", JSON.stringify(arSystem.controller.imageTargets.map(t => ({
-                                targetIndex: t.targetIndex,
-                                width: t.width,
-                                height: t.height
-                            }))));
+                            const targets = arSystem.controller.imageTargets;
+                            logToScreen("Found " + targets.length + " image targets in controller.");
+                            targets.forEach(t => {
+                                targetDimensions[t.targetIndex] = {
+                                    width: t.width,
+                                    height: t.height,
+                                    aspectRatio: t.width / t.height
+                                };
+                                logToScreen("Target " + t.targetIndex + ": width=" + t.width.toFixed(2) + ", height=" + t.height.toFixed(2) + ", AR=" + (t.width/t.height).toFixed(3));
+                            });
                         } else {
-                            console.log("MY_TARGETS_DUMP: controller or imageTargets not found");
+                            logToScreen("Warning: controller or imageTargets not found.");
                         }
                     } catch (e) {
-                        console.error("Error logging targets:", e);
+                        logToScreen("Error reading targets: " + e.message);
                     }
                 }, 1000);
             }
@@ -200,56 +257,135 @@
                 overlay.style.opacity = '0';
                 setTimeout(() => overlay.style.display = 'none', 500);
                 indicator.classList.remove('hidden');
+                logToScreen("Scanning started");
 
-                // 確保引擎啟動
+                // Ensure engine start
                 try {
                     const arSystem = sceneEl.systems['mindar-image-system'];
-                    if (arSystem && !arSystem.main) arSystem.start();
-                } catch (e) { console.error(e); }
+                    if (arSystem && !arSystem.main) {
+                        arSystem.start();
+                        logToScreen("AR System started manually.");
+                    }
+                } catch (e) { 
+                    logToScreen("Error starting system: " + e.message); 
+                }
 
-                // 解鎖影音
+                // Unlock audio/video for mobile browsers
                 document.querySelectorAll('video').forEach(v => {
-                    v.play().then(() => { v.pause(); v.currentTime = 0; }).catch(() => { });
+                    v.play().then(() => { 
+                        v.pause(); 
+                        v.currentTime = 0; 
+                    }).catch((err) => { 
+                        logToScreen("Unlock video failed for id " + v.id + ": " + err.message); 
+                    });
                 });
 
-                // 檢查背景相機
+                // Check background camera video element
                 setTimeout(() => {
                     const sv = document.querySelector('video[autoplay]');
                     if (sv) {
                         if (sv.paused) sv.play().catch(() => { });
                         sv.style.zIndex = "-1";
                         sv.style.backgroundColor = "transparent";
+                        logToScreen("Background camera adjusted.");
                     }
                 }, 1000);
             };
 
-
-
             document.querySelectorAll('.ar-target').forEach(t => {
+                const targetIndexAttr = t.getAttribute('mindar-image-target');
+                const targetIndexMatch = targetIndexAttr.match(/targetIndex:\s*(\d+)/);
+                const targetIndex = targetIndexMatch ? parseInt(targetIndexMatch[1]) : 0;
+
                 t.addEventListener('targetFound', () => {
                     const vidId = t.getAttribute('data-video');
+                    logToScreen("Target found! index=" + targetIndex + ", video=" + vidId);
+                    
                     indicator.classList.add('hidden');
                     const v = document.getElementById(vidId);
-                    activeVid = v;
-                    if (v) {
-                        v.play().catch(() => {
-                            document.querySelector('#tap-to-play').classList.remove('hidden');
-                        });
+                    if (!v) {
+                        logToScreen("Error: Video element #" + vidId + " not found.");
+                        return;
                     }
+
+                    activeTargetIndex = targetIndex;
+
+                    // Determine aspect ratio from targets or fall back
+                    let ar = 1.5;
+                    if (targetDimensions[targetIndex]) {
+                        ar = targetDimensions[targetIndex].aspectRatio;
+                    } else {
+                        logToScreen("Target dimensions not cached, reading dynamic controller data...");
+                        try {
+                            const arSystem = sceneEl.systems['mindar-image-system'];
+                            if (arSystem && arSystem.controller && arSystem.controller.imageTargets) {
+                                const targetObj = arSystem.controller.imageTargets[targetIndex];
+                                if (targetObj) {
+                                    ar = targetObj.width / targetObj.height;
+                                    logToScreen("Dynamic target size: " + targetObj.width + "x" + targetObj.height);
+                                }
+                            }
+                        } catch (err) {
+                            logToScreen("Error reading dynamic target: " + err.message);
+                        }
+                    }
+
+                    resizeVideoOverlay(ar);
+
+                    const videoSrc = v.getAttribute('src');
+                    overlayVideo.src = videoSrc;
+                    
+                    activeVid = overlayVideo;
+                    overlayContainer.classList.add('show');
+                    
+                    logToScreen("Attempting to play video: " + videoSrc);
+                    overlayVideo.play().then(() => {
+                        logToScreen("Playback started successfully.");
+                    }).catch(err => {
+                        logToScreen("Play blocked: " + err.message + ". Showing Tap to Play overlay.");
+                        document.querySelector('#tap-to-play').classList.remove('hidden');
+                    });
                 });
+
                 t.addEventListener('targetLost', () => {
+                    logToScreen("Target lost. index=" + targetIndex);
                     indicator.classList.remove('hidden');
                     document.querySelector('#tap-to-play').classList.add('hidden');
-                    const v = document.getElementById(t.getAttribute('data-video'));
-                    if (v) v.pause();
-                    if (activeVid === v) activeVid = null;
+                    
+                    overlayContainer.classList.remove('show');
+                    overlayVideo.pause();
+                    overlayVideo.src = "";
+                    
+                    if (activeTargetIndex === targetIndex) {
+                        activeTargetIndex = null;
+                    }
+                    if (activeVid === overlayVideo) {
+                        activeVid = null;
+                    }
                 });
             });
 
             document.querySelector('#tap-to-play').onclick = function () {
-                if (activeVid) activeVid.play().catch(() => { });
+                if (overlayVideo) {
+                    logToScreen("Tap to play clicked. Forcing playback...");
+                    overlayVideo.play().then(() => {
+                        logToScreen("Forced playback succeeded.");
+                    }).catch(err => {
+                        logToScreen("Forced play failed: " + err.message);
+                    });
+                }
                 this.classList.add('hidden');
             };
+
+            window.addEventListener('resize', () => {
+                if (overlayContainer.classList.contains('show') && activeTargetIndex !== null) {
+                    let ar = 1.5;
+                    if (targetDimensions[activeTargetIndex]) {
+                        ar = targetDimensions[activeTargetIndex].aspectRatio;
+                    }
+                    resizeVideoOverlay(ar);
+                }
+            });
         };
     </script>
 </body>
